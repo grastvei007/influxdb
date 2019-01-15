@@ -1,0 +1,12 @@
+#ifndef INFLUXDB_GLOBAL_H
+#define INFLUXDB_GLOBAL_H
+
+#include <QtCore/qglobal.h>
+
+#if defined(INFLUXDB_LIBRARY)
+#  define INFLUXDBSHARED_EXPORT Q_DECL_EXPORT
+#else
+#  define INFLUXDBSHARED_EXPORT Q_DECL_IMPORT
+#endif
+
+#endif // INFLUXDB_GLOBAL_H
