@@ -13,7 +13,7 @@ TEMPLATE = lib
 release: TARGET = influxdb
 debug: TARGET = influxdbd
 
-DESTDIR = /home/steini/Develop/lib
+DESTDIR = $$(DEV_LIBS)
 
 release: BUILDDIR = build/release
 debug:   BUILDDIR = build/debug
