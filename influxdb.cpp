@@ -5,6 +5,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QFile>
+#include <QProcessEnvironment>
 
 InfluxDB& InfluxDB::sGetInstance()
 {
@@ -17,6 +19,7 @@ InfluxDB::InfluxDB() :
     mDBAdress("localhost"),
     mDbPort(8086)
 {
+    readConfigFile();
     updateDatabaseList();
 }
 
@@ -146,4 +149,38 @@ void InfluxDB::updateDataBaseNameListSlot()
     }
     mReply->deleteLater();
     mReply = nullptr;
+}
+
+
+void InfluxDB::readConfigFile()
+{
+    QString path = QProcessEnvironment::systemEnvironment().value("JUNE_ROOT");
+    path.append("/config/influxdb.conf");
+    QFile file(path);
+    if(!file.exists())
+    {
+        qDebug() << __FUNCTION__ << "Config file does not exist, " << path;
+        return;
+    }
+    if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        qDebug() << __FUNCTION__ << "Error opening config file, " << path;
+        return;
+    }
+
+    while (!file.atEnd()) {
+        QString line(file.readLine());
+        if(line.startsWith("#")) // skip comments
+            continue;
+
+        // prosess line for config
+        if(line.startsWith("dblog"))
+        {
+            QStringList p = line.split(" ");
+            mDbLogPath = p[1];
+        }
+    }
+
+
+    file.close();
 }
