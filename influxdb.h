@@ -26,7 +26,9 @@ public:
 
 private:
     InfluxDB();
+
     void logDbQuery(QString aQuery);
+    void readConfigFile();
 
     void updateDatabaseList(); ///< update the available databases at endpoint.
 private slots:
@@ -42,6 +44,7 @@ private:
 
     QNetworkReply *mReply;
     QStringList mDatabases;
+    QString mDbLogPath;
 };
 
 #endif // INFLUXDB_H
