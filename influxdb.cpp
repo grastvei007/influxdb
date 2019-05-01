@@ -84,6 +84,7 @@ void InfluxDB::insert(QString aQuery)
 void InfluxDB::insert(QString aTableName, QString aTuppleList)
 {
     QString query = QString("%1,%2").arg(aTableName).arg(aTuppleList);
+    logDbQuery(query);
     insert(query);
 }
 
@@ -146,4 +147,10 @@ void InfluxDB::updateDataBaseNameListSlot()
     }
     mReply->deleteLater();
     mReply = nullptr;
+}
+
+
+void InfluxDB::logDbQuery(QString aQuery)
+{
+
 }

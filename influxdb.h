@@ -26,6 +26,7 @@ public:
 
 private:
     InfluxDB();
+    void logDbQuery(QString aQuery);
 
     void updateDatabaseList(); ///< update the available databases at endpoint.
 private slots:
