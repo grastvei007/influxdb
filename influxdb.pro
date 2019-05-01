@@ -4,9 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += network
-
-QT       -= gui
+QT       += network widgets
 
 TEMPLATE = lib
 
@@ -37,13 +35,20 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-        influxdb.cpp
+        influxdb.cpp \
+    dbwidget.cpp \
+    dbdata.cpp
 
 HEADERS += \
         influxdb.h \
-        influxdb_global.h 
+        influxdb_global.h \ 
+    dbwidget.h \
+    dbdata.h
 
 unix {
     target.path = /usr/lib
     INSTALLS += target
 }
+
+FORMS += \
+    dbwidget.ui

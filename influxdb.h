@@ -4,6 +4,7 @@
 #include <QString>
 #include <QStringList>
 #include <QNetworkAccessManager>
+#include <QFile>
 
 class QNetworkReply;
 
@@ -31,6 +32,7 @@ private:
     void readConfigFile();
 
     void updateDatabaseList(); ///< update the available databases at endpoint.
+    void openLogFile();
 private slots:
     void updateDataBaseNameListSlot();
 
@@ -45,6 +47,9 @@ private:
     QNetworkReply *mReply;
     QStringList mDatabases;
     QString mDbLogPath;
+
+    QFile mLogFile;
+    QString mLogFileName;
 };
 
 #endif // INFLUXDB_H
