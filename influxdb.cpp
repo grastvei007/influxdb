@@ -6,6 +6,9 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QProcessEnvironment>
+#include <QDateTime>
+#include <QTextStream>
+
 
 InfluxDB& InfluxDB::sGetInstance()
 {
@@ -21,6 +24,28 @@ InfluxDB::InfluxDB() :
     readConfigFile();
     openLogFile();
     updateDatabaseList();
+
+    connect(&mNetworkAcessManager, &QNetworkAccessManager::finished, this, &InfluxDB::onReplyFinnished);
+}
+
+QString InfluxDB::pressisionToString(Pressision aPressision) const
+{
+    switch (aPressision)
+    {
+        case eNanoSecond:
+            return "ns";
+        case eMicroSecond:
+            return "u";
+        case eMiliSecond:
+            return "ms";
+        case eSecond:
+            return "s";
+        case eMinut:
+            return "m";
+        case eHour:
+            return "h";
+    }
+    return QString();
 }
 
 
@@ -45,7 +70,7 @@ void InfluxDB::setPort(int aPort)
 }
 
 /*
- * $ curl -XPOST 'http://localhost:8086/query' --data-urlencode 'q=CREATE DATABASE "mydb"'
+ * $ curl -XPOST 'http://localhost:8086/query' --data-urlencode 'q=CREATE DATABASE "june"'
 
 {"results":[{"statement_id":0}]}
 */
@@ -59,24 +84,26 @@ void InfluxDB::createDb(QString aDbName)
     QByteArray postData;
     postData.append(QString("q=CREATE DATABASE \"%1\"").arg(aDbName));
 
-    mNetworkAcessManager.post(request, postData);
+    QNetworkReply *reply = mNetworkAcessManager.post(request, postData);
 }
 
 /*
  * $ curl -i -XPOST "http://localhost:8086/write?db=mydb&precision=s" --data-binary 'mymeas,mytag=1 myfield=90 1463683075'
  * */
-void InfluxDB::insert(QString aQuery)
+void InfluxDB::insert(QString aQuery, Pressision aPressision)
 {
-    QString url = QString("http://%1:%2/write?db=%3&precision=s").arg(mDBAdress).arg(QString::number(mDbPort)).arg(mDbName);
+    QString url = QString("http://%1:%2/write?db=%3&precision=%4")
+            .arg(mDBAdress)
+            .arg(QString::number(mDbPort))
+            .arg(mDbName)
+            .arg(pressisionToString(aPressision));
 
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-
     QByteArray postData;
     postData.append(aQuery);
-
-    mNetworkAcessManager.post(request, postData);
-
+    QNetworkReply *reply = mNetworkAcessManager.post(request, postData);
+    mReplies[reply] = aQuery;
 }
 
 /**
@@ -86,9 +113,18 @@ void InfluxDB::insert(QString aQuery)
  */
 void InfluxDB::insert(QString aTableName, QString aTuppleList)
 {
-    QString query = QString("%1,%2").arg(aTableName).arg(aTuppleList);
+     qint64 timestamp = QDateTime::currentSecsSinceEpoch();
+
+    QString query = QString("%1,%2 %3").arg(aTableName).arg(aTuppleList).arg(timestamp);
     logDbQuery(query);
     insert(query);
+}
+
+void InfluxDB::insert(QString aTableName, QString aTuppleList, qint64 aTimestamp, InfluxDB::Pressision aPression)
+{
+    QString query = QString("%1,%2 %3").arg(aTableName).arg(aTuppleList).arg(aTimestamp);
+    logDbQuery(query);
+    insert(query, aPression);
 }
 
 void InfluxDB::useDb(QString aDbName)
@@ -103,7 +139,7 @@ QStringList InfluxDB::getDatabases()
 }
 
 
-// curl -G "http://somehost:8086/query?pretty=true" --data-urlencode "q=show databases"
+// curl -G "http://localhost:8086/query?pretty=true" --data-urlencode "q=show databases"
 void InfluxDB::updateDatabaseList()
 {
     QString url = QString("http://%1:%2/query?pretty=true").arg(mDBAdress).arg(mDbPort);
@@ -156,7 +192,11 @@ void InfluxDB::updateDataBaseNameListSlot()
 
 void InfluxDB::logDbQuery(QString aQuery)
 {
+    if(!mLogFile.isOpen())
+        return;
 
+    QTextStream stream(&mLogFile);
+    stream << aQuery << "\n";
 }
 
 
@@ -196,10 +236,60 @@ void InfluxDB::readConfigFile()
 
 void InfluxDB::openLogFile()
 {
+    int msHour = 1000*3600;
+
+    QTime time = QTime::currentTime();
+    int ms = time.msecsSinceStartOfDay();
+    while(ms > msHour)
+        ms -= msHour;
+    ms = msHour - ms;
+    qDebug() << "ms: " << ms;
+    QTimer::singleShot(ms, this, &InfluxDB::onHourChange); // call next hour change.
+
     QString path = QProcessEnvironment::systemEnvironment().value("JUNE_ROOT");
     path.append("/log/");
-    QString file = QDateTime::currentDateTime().toString();
+    QString file = QDateTime::currentDateTime().toString("dd.MM.yyyy-hh.mm.ss");
     file.append(".log");
     path.append(file);
 
+    mLogFileName = path;
+    mLogFile.setFileName(mLogFileName);
+    if(!mLogFile.open(QIODevice::WriteOnly))
+    {
+        qDebug() << "Error opening file, " << mLogFileName;
+        return;
+    }
+    qDebug() << "open logifile, " << mLogFileName;
+}
+
+
+void InfluxDB::onHourChange()
+{
+    if(mLogFile.isOpen())
+        mLogFile.close();
+    openLogFile();
+}
+
+void InfluxDB::onReplyFinnished(QNetworkReply *aReply)
+{
+    if(!mReplies.contains(aReply))
+    {
+        qDebug() << "Reply does not exist! ";
+        return;
+    }
+
+    if(aReply->error() != QNetworkReply::NoError)
+    {
+        logDbQuery(mReplies[aReply]);
+    }
+    else
+    {
+        // is there a log file, read it put in queue, delete file.
+    }
+
+    QMap<QNetworkReply*,QString>::iterator iter = mReplies.find(aReply);
+    mReplies.erase(iter);
+    aReply->deleteLater();
+
+    // is there a queue from file? send next to db.
 }
