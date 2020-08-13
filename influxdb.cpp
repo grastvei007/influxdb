@@ -88,7 +88,7 @@ void InfluxDB::createDb(QString aDbName)
 }
 
 /*
- * $ curl -i -XPOST "http://localhost:8086/write?db=mydb&precision=s" --data-binary 'mymeas,mytag=1 myfield=90 1463683075'
+ * $ curl -i -XPOST "http://localhost:8086/write?db=june&precision=s" --data-binary 'bmv,v=12.3 1463683075'
  * */
 void InfluxDB::insert(QString aQuery, Pressision aPressision)
 {
@@ -97,6 +97,8 @@ void InfluxDB::insert(QString aQuery, Pressision aPressision)
             .arg(QString::number(mDbPort))
             .arg(mDbName)
             .arg(pressisionToString(aPressision));
+
+    qDebug() << url << aQuery;
 
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
@@ -115,14 +117,14 @@ void InfluxDB::insert(QString aTableName, QString aTuppleList)
 {
      qint64 timestamp = QDateTime::currentSecsSinceEpoch();
 
-    QString query = QString("%1,%2 %3").arg(aTableName).arg(aTuppleList).arg(timestamp);
+    QString query = QString("%1 %2 %3").arg(aTableName).arg(aTuppleList).arg(timestamp);
     logDbQuery(query);
     insert(query);
 }
 
 void InfluxDB::insert(QString aTableName, QString aTuppleList, qint64 aTimestamp, InfluxDB::Pressision aPression)
 {
-    QString query = QString("%1,%2 %3").arg(aTableName).arg(aTuppleList).arg(aTimestamp);
+    QString query = QString("%1 %2 %3").arg(aTableName).arg(aTuppleList).arg(aTimestamp);
     logDbQuery(query);
     insert(query, aPression);
 }
