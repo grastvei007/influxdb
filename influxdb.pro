@@ -36,10 +36,10 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 
 if(debug){
-LIBS += -L$$(DEV_LIBS) -ltagsystemd
+LIBS += -L$$(DEV_LIBS)
 }
 else{
-LIBS += -L$$(DEV_LIBS) -ltagsystem
+LIBS += -L$$(DEV_LIBS)
 }
 
 INCLUDEPATH += $$(JUNE_ROOT)
@@ -47,22 +47,15 @@ INCLUDEPATH += $$(JUNE_ROOT)
 
 
 SOURCES += \
-        influxdb.cpp \
-    dbwidget.cpp \
-    dbdata.cpp \
-    table.cpp
+        influxdb.cpp
 
 HEADERS += \
         influxdb.h \
-        influxdb_global.h \
-        table.h \
-        dbwidget.h \
-        dbdata.h
+        influxdb_global.h
 
 unix {
     target.path = /usr/lib
     INSTALLS += target
 }
 
-FORMS += \
-    dbwidget.ui
+FORMS +=
