@@ -82,9 +82,10 @@ void InfluxDB::createDb(QString aDbName)
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
     QByteArray postData;
-    postData.append(QString("q=CREATE DATABASE \"%1\"").arg(aDbName));
+    postData.append(QString("q=CREATE DATABASE \"%1\"").arg(aDbName).toLatin1());
 
     QNetworkReply *reply = mNetworkAcessManager.post(request, postData);
+    Q_UNUSED(reply);
 }
 
 /*
@@ -103,7 +104,7 @@ void InfluxDB::insert(QString aQuery, Pressision aPressision)
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     QByteArray postData;
-    postData.append(aQuery);
+    postData.append(aQuery.toLatin1());
     QNetworkReply *reply = mNetworkAcessManager.post(request, postData);
     mReplies[reply] = aQuery;
 }
@@ -150,7 +151,7 @@ void InfluxDB::updateDatabaseList()
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     QByteArray postDate;
-    postDate.append(query);
+    postDate.append(query.toLatin1());
     if(mReply)
     {
         mReply->deleteLater();
