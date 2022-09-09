@@ -104,8 +104,9 @@ void InfluxDB::insert(QString aQuery, Pressision aPressision)
     data.request = new QNetworkRequest(url);
     data.request->setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     data.data.append(aQuery.toLatin1());
-    sendQueue_.push_back(data);
     data.query = aQuery;
+
+    sendQueue_.push_back(data);
     postData();
 }
 
@@ -284,7 +285,10 @@ void InfluxDB::onHourChange()
 void InfluxDB::postData()
 {
     if(sendQueue_.isEmpty())
+    {
+        isSending = false;
         return;
+    }
 
     if(!isSending)
     {
@@ -294,7 +298,7 @@ void InfluxDB::postData()
         qDebug() << request.query;
 
         QNetworkReply *reply = mNetworkAcessManager.post(*request.request, request.data);
-        mReplies[reply] = request.query;;
+        mReplies[reply] = request.query;
 
     }
 }
