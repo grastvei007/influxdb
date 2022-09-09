@@ -23,6 +23,7 @@ along with Foobar.  If not, see <https://www.gnu.org/licenses/>.*/
 #include <QFile>
 #include <QMap>
 #include <QTimer>
+#include <QVector>
 
 class QNetworkReply;
 
@@ -64,6 +65,9 @@ public:
 
     QStringList getDatabases();
 
+signals:
+    void readyToPost();
+
 private:
     InfluxDB();
     QString pressisionToString(Pressision aPressision) const;
@@ -78,6 +82,8 @@ private slots:
     void updateDataBaseNameListSlot();
     void onReplyFinnished(QNetworkReply *aReply);
     void onHourChange(); ///< called everytime the hour is changed.
+    void postData();
+
 private:
     QString mDBAdress;
     int mDbPort;
@@ -93,7 +99,16 @@ private:
     QFile mLogFile;
     QString mLogFileName;
 
+    struct requestData
+    {
+        QNetworkRequest *request;
+        QByteArray data;
+        QString query;
+    };
+
     QMap<QNetworkReply*, QString> mReplies;
+    QVector<requestData> sendQueue_;
+    bool isSending = false;
 };
 
 #endif // INFLUXDB_H

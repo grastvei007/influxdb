@@ -26,6 +26,7 @@ InfluxDB::InfluxDB() :
     updateDatabaseList();
 
     connect(&mNetworkAcessManager, &QNetworkAccessManager::finished, this, &InfluxDB::onReplyFinnished);
+    connect(this, &InfluxDB::readyToPost, this, &InfluxDB::postData);
 }
 
 QString InfluxDB::pressisionToString(Pressision aPressision) const
@@ -101,12 +102,13 @@ void InfluxDB::insert(QString aQuery, Pressision aPressision)
 
     qDebug() << url << aQuery;
 
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    QByteArray postData;
-    postData.append(aQuery.toLatin1());
-    QNetworkReply *reply = mNetworkAcessManager.post(request, postData);
-    mReplies[reply] = aQuery;
+    requestData data;
+    data.request = new QNetworkRequest(url);
+    data.request->setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    data.data.append(aQuery.toLatin1());
+    sendQueue_.push_back(data);
+    data.query = aQuery;
+    postData();
 }
 
 /**
@@ -281,12 +283,31 @@ void InfluxDB::onHourChange()
     openLogFile();
 }
 
+void InfluxDB::postData()
+{
+    if(sendQueue_.isEmpty())
+        return;
+
+    if(!isSending)
+    {
+        isSending = true;
+        auto request = sendQueue_.first();
+        sendQueue_.pop_front();
+
+        QNetworkReply *reply = mNetworkAcessManager.post(*request.request, request.data);
+        mReplies[reply] = request.query;;
+
+    }
+}
+
 void InfluxDB::onReplyFinnished(QNetworkReply *reply)
 {
+    isSending = false;
     if(!mReplies.contains(reply))
     {
         qDebug() << "Reply does not exist! ";
         reply->deleteLater();
+        emit readyToPost();
         return;
     }
 
@@ -305,6 +326,8 @@ void InfluxDB::onReplyFinnished(QNetworkReply *reply)
     auto iter = mReplies.find(reply);
     mReplies.erase(iter);
     reply->deleteLater();
+
+    emit readyToPost();
 
     // is there a queue from file? send next to db.
 }
