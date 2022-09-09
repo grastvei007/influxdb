@@ -100,8 +100,6 @@ void InfluxDB::insert(QString aQuery, Pressision aPressision)
             .arg(mDbName)
             .arg(pressisionToString(aPressision));
 
-    qDebug() << url << aQuery;
-
     requestData data;
     data.request = new QNetworkRequest(url);
     data.request->setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
@@ -293,6 +291,7 @@ void InfluxDB::postData()
         isSending = true;
         auto request = sendQueue_.first();
         sendQueue_.pop_front();
+        qDebug() << request.query;
 
         QNetworkReply *reply = mNetworkAcessManager.post(*request.request, request.data);
         mReplies[reply] = request.query;;
