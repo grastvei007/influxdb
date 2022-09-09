@@ -265,6 +265,14 @@ void InfluxDB::openLogFile()
     qDebug() << "open logifile, " << mLogFileName;
 }
 
+bool InfluxDB::isServerSideError(QNetworkReply::NetworkError error)
+{
+    return error == QNetworkReply::InternalServerError
+            || error == QNetworkReply::OperationNotImplementedError
+            || error == QNetworkReply::ServiceUnavailableError
+            || error == QNetworkReply::UnknownServerError;
+}
+
 
 void InfluxDB::onHourChange()
 {
@@ -273,26 +281,30 @@ void InfluxDB::onHourChange()
     openLogFile();
 }
 
-void InfluxDB::onReplyFinnished(QNetworkReply *aReply)
+void InfluxDB::onReplyFinnished(QNetworkReply *reply)
 {
-    if(!mReplies.contains(aReply))
+    if(!mReplies.contains(reply))
     {
         qDebug() << "Reply does not exist! ";
+        reply->deleteLater();
         return;
     }
 
-    if(aReply->error() != QNetworkReply::NoError)
+    if(isServerSideError(reply->error()))
     {
-        logDbQuery(mReplies[aReply]);
+        logDbQuery(mReplies[reply]);
+        qDebug() << reply->errorString();
     }
     else
     {
+        qDebug() << reply->errorString();
         // is there a log file, read it put in queue, delete file.
     }
 
-    QMap<QNetworkReply*,QString>::iterator iter = mReplies.find(aReply);
+    //Map<QNetworkReply*,QString>::iterator
+    auto iter = mReplies.find(reply);
     mReplies.erase(iter);
-    aReply->deleteLater();
+    reply->deleteLater();
 
     // is there a queue from file? send next to db.
 }

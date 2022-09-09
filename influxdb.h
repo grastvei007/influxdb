@@ -19,6 +19,7 @@ along with Foobar.  If not, see <https://www.gnu.org/licenses/>.*/
 #include <QString>
 #include <QStringList>
 #include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QFile>
 #include <QMap>
 #include <QTimer>
@@ -71,6 +72,7 @@ private:
 
     void updateDatabaseList(); ///< update the available databases at endpoint.
     void openLogFile();
+    bool isServerSideError(QNetworkReply::NetworkError error);
 
 private slots:
     void updateDataBaseNameListSlot();
