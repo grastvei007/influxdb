@@ -299,7 +299,7 @@ void InfluxDB::postData()
 
         QNetworkReply *reply = mNetworkAcessManager.post(*request.request, request.data);
         mReplies[reply] = request.query;
-
+        delete request.request;
     }
 }
 
@@ -332,5 +332,4 @@ void InfluxDB::onReplyFinnished(QNetworkReply *reply)
 
     emit readyToPost();
 
-    // is there a queue from file? send next to db.
 }
