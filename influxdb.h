@@ -42,7 +42,7 @@ class InfluxDB : public QObject
 {
     Q_OBJECT
 public:
-    static InfluxDB& sGetInstance();
+    InfluxDB(QNetworkAccessManager &networkAccessManager);
     enum Pressision
     {
         eNanoSecond,
@@ -69,7 +69,6 @@ signals:
     void readyToPost();
 
 private:
-    InfluxDB();
     QString pressisionToString(Pressision aPressision) const;
     void logDbQuery(QString aQuery);
     void readConfigFile();
@@ -85,12 +84,11 @@ private slots:
     void postData();
 
 private:
+    QNetworkAccessManager &networkAcessManager_;
     QString mDBAdress;
     int mDbPort;
 
     QString mDbName; // the db current in use.
-
-    QNetworkAccessManager mNetworkAcessManager;
 
     QNetworkReply *mReply;
     QStringList mDatabases;

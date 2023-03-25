@@ -10,14 +10,8 @@
 #include <QTextStream>
 
 
-InfluxDB& InfluxDB::sGetInstance()
-{
-    static InfluxDB db;
-    return db;
-}
-
-
-InfluxDB::InfluxDB() :
+InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
+    networkAcessManager_(networkAccessManager),
     mDBAdress("localhost"),
     mDbPort(8086)
 {
@@ -25,7 +19,7 @@ InfluxDB::InfluxDB() :
     openLogFile();
     updateDatabaseList();
 
-    connect(&mNetworkAcessManager, &QNetworkAccessManager::finished, this, &InfluxDB::onReplyFinnished);
+    connect(&networkAcessManager_, &QNetworkAccessManager::finished, this, &InfluxDB::onReplyFinnished);
     connect(this, &InfluxDB::readyToPost, this, &InfluxDB::postData);
 }
 
@@ -85,7 +79,7 @@ void InfluxDB::createDb(QString aDbName)
     QByteArray postData;
     postData.append(QString("q=CREATE DATABASE \"%1\"").arg(aDbName).toLatin1());
 
-    QNetworkReply *reply = mNetworkAcessManager.post(request, postData);
+    QNetworkReply *reply = networkAcessManager_.post(request, postData);
     Q_UNUSED(reply);
 }
 
@@ -159,7 +153,7 @@ void InfluxDB::updateDatabaseList()
         mReply = nullptr;
     }
 
-    mReply = mNetworkAcessManager.post(request, postDate);
+    mReply = networkAcessManager_.post(request, postDate);
     connect(mReply, &QNetworkReply::readyRead, this, &InfluxDB::updateDataBaseNameListSlot);
     if(mReply->waitForReadyRead(30000))
     {
@@ -297,7 +291,7 @@ void InfluxDB::postData()
         sendQueue_.pop_front();
         qDebug() << request.query;
 
-        QNetworkReply *reply = mNetworkAcessManager.post(*request.request, request.data);
+        QNetworkReply *reply = networkAcessManager_.post(*request.request, request.data);
         mReplies[reply] = request.query;
         delete request.request;
     }
