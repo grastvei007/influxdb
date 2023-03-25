@@ -18,8 +18,6 @@ InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
     readConfigFile();
     openLogFile();
     updateDatabaseList();
-
-    connect(this, &InfluxDB::readyToPost, this, &InfluxDB::postData);
 }
 
 QString InfluxDB::pressisionToString(Pressision aPressision) const
@@ -93,14 +91,8 @@ void InfluxDB::insert(QString aQuery, Pressision aPressision)
             .arg(mDbName)
             .arg(pressisionToString(aPressision));
 
-    requestData data;
-    data.request = new QNetworkRequest(url);
-    data.request->setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    data.data.append(aQuery.toLatin1());
-    data.query = aQuery;
-
-    sendQueue_.push_back(data);
-    postData();
+    QNetworkReply *reply = networkAcessManager_.post(QNetworkRequest(url), aQuery.toLatin1());
+    connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyFinnished);
 }
 
 /**
@@ -275,28 +267,6 @@ void InfluxDB::onHourChange()
     openLogFile();
 }
 
-void InfluxDB::postData()
-{
-    if(sendQueue_.isEmpty())
-    {
-        isSending = false;
-        return;
-    }
-
-    if(!isSending)
-    {
-        isSending = true;
-        auto request = sendQueue_.first();
-        sendQueue_.pop_front();
-        qDebug() << request.query;
-
-        QNetworkReply *reply = networkAcessManager_.post(*request.request, request.data);
-        connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyFinnished);
-        mReplies[reply] = request.query;
-        delete request.request;
-    }
-}
-
 void InfluxDB::onReplyFinnished()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
@@ -305,18 +275,9 @@ void InfluxDB::onReplyFinnished()
         qDebug() << "Unknown QNetworkReply";
         return;
     }
-    isSending = false;
-    if(!mReplies.contains(reply))
-    {
-        qDebug() << "Reply does not exist! ";
-        reply->deleteLater();
-        emit readyToPost();
-        return;
-    }
 
     if(isServerSideError(reply->error()))
     {
-        logDbQuery(mReplies[reply]);
         qDebug() << reply->errorString();
     }
     else if(reply->error() != 0)
@@ -325,10 +286,5 @@ void InfluxDB::onReplyFinnished()
         // is there a log file, read it put in queue, delete file.
     }
 
-    auto iter = mReplies.find(reply);
-    mReplies.erase(iter);
     reply->deleteLater();
-
-    emit readyToPost();
-
 }

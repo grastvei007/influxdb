@@ -65,9 +65,6 @@ public:
 
     QStringList getDatabases();
 
-signals:
-    void readyToPost();
-
 private:
     QString pressisionToString(Pressision aPressision) const;
     void logDbQuery(QString aQuery);
@@ -81,7 +78,6 @@ private slots:
     void updateDataBaseNameListSlot();
     void onReplyFinnished();
     void onHourChange(); ///< called everytime the hour is changed.
-    void postData();
 
 private:
     QNetworkAccessManager &networkAcessManager_;
@@ -96,17 +92,6 @@ private:
 
     QFile mLogFile;
     QString mLogFileName;
-
-    struct requestData
-    {
-        QNetworkRequest *request;
-        QByteArray data;
-        QString query;
-    };
-
-    QMap<QNetworkReply*, QString> mReplies;
-    QVector<requestData> sendQueue_;
-    bool isSending = false;
 };
 
 #endif // INFLUXDB_H
