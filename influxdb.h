@@ -79,7 +79,7 @@ private:
 
 private slots:
     void updateDataBaseNameListSlot();
-    void onReplyFinnished(QNetworkReply *aReply);
+    void onReplyFinnished();
     void onHourChange(); ///< called everytime the hour is changed.
     void postData();
 

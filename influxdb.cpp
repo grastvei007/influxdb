@@ -19,7 +19,6 @@ InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
     openLogFile();
     updateDatabaseList();
 
-    connect(&networkAcessManager_, &QNetworkAccessManager::finished, this, &InfluxDB::onReplyFinnished);
     connect(this, &InfluxDB::readyToPost, this, &InfluxDB::postData);
 }
 
@@ -292,13 +291,20 @@ void InfluxDB::postData()
         qDebug() << request.query;
 
         QNetworkReply *reply = networkAcessManager_.post(*request.request, request.data);
+        connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyFinnished);
         mReplies[reply] = request.query;
         delete request.request;
     }
 }
 
-void InfluxDB::onReplyFinnished(QNetworkReply *reply)
+void InfluxDB::onReplyFinnished()
 {
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if(!reply)
+    {
+        qDebug() << "Unknown QNetworkReply";
+        return;
+    }
     isSending = false;
     if(!mReplies.contains(reply))
     {
@@ -313,13 +319,12 @@ void InfluxDB::onReplyFinnished(QNetworkReply *reply)
         logDbQuery(mReplies[reply]);
         qDebug() << reply->errorString();
     }
-    else
+    else if(reply->error() != 0)
     {
         qDebug() << reply->errorString();
         // is there a log file, read it put in queue, delete file.
     }
 
-    //Map<QNetworkReply*,QString>::iterator
     auto iter = mReplies.find(reply);
     mReplies.erase(iter);
     reply->deleteLater();
