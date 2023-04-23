@@ -16,7 +16,6 @@ InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
     mDbPort(8086)
 {
     readConfigFile();
-    openLogFile();
 }
 
 QString InfluxDB::pressisionToString(Pressision aPressision) const
@@ -104,14 +103,12 @@ void InfluxDB::insert(QString aTableName, QString aTuppleList)
      qint64 timestamp = QDateTime::currentSecsSinceEpoch();
 
     QString query = QString("%1 %2 %3").arg(aTableName).arg(aTuppleList).arg(timestamp);
-    logDbQuery(query);
     insert(query);
 }
 
 void InfluxDB::insert(QString aTableName, QString aTuppleList, qint64 aTimestamp, InfluxDB::Pressision aPression)
 {
     QString query = QString("%1 %2 %3").arg(aTableName).arg(aTuppleList).arg(aTimestamp);
-    logDbQuery(query);
     insert(query, aPression);
 }
 
@@ -150,18 +147,6 @@ void InfluxDB::updateDataBaseNameListSlot()
     mReply = nullptr;
 }
 
-
-
-void InfluxDB::logDbQuery(QString aQuery)
-{
-    if(!mLogFile.isOpen())
-        return;
-
-    QTextStream stream(&mLogFile);
-    stream << aQuery << "\n";
-}
-
-
 void InfluxDB::readConfigFile()
 {
     QString path = QProcessEnvironment::systemEnvironment().value("JUNE_ROOT");
@@ -195,49 +180,12 @@ void InfluxDB::readConfigFile()
     file.close();
 }
 
-
-void InfluxDB::openLogFile()
-{
-    int msHour = 1000*3600;
-
-    QTime time = QTime::currentTime();
-    int ms = time.msecsSinceStartOfDay();
-    while(ms > msHour)
-        ms -= msHour;
-    ms = msHour - ms;
-    qDebug() << "ms: " << ms;
-    QTimer::singleShot(ms, this, &InfluxDB::onHourChange); // call next hour change.
-
-    QString path = QProcessEnvironment::systemEnvironment().value("JUNE_ROOT");
-    path.append("/log/");
-    QString file = QDateTime::currentDateTime().toString("dd.MM.yyyy-hh.mm.ss");
-    file.append(".log");
-    path.append(file);
-
-    mLogFileName = path;
-    mLogFile.setFileName(mLogFileName);
-    if(!mLogFile.open(QIODevice::WriteOnly))
-    {
-        qDebug() << "Error opening file, " << mLogFileName;
-        return;
-    }
-    qDebug() << "open logifile, " << mLogFileName;
-}
-
 bool InfluxDB::isServerSideError(QNetworkReply::NetworkError error)
 {
     return error == QNetworkReply::InternalServerError
             || error == QNetworkReply::OperationNotImplementedError
             || error == QNetworkReply::ServiceUnavailableError
             || error == QNetworkReply::UnknownServerError;
-}
-
-
-void InfluxDB::onHourChange()
-{
-    if(mLogFile.isOpen())
-        mLogFile.close();
-    openLogFile();
 }
 
 void InfluxDB::onReplyFinnished()

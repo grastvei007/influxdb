@@ -67,16 +67,13 @@ public:
 
 private:
     QString pressisionToString(Pressision aPressision) const;
-    void logDbQuery(QString aQuery);
     void readConfigFile();
 
-    void openLogFile();
     bool isServerSideError(QNetworkReply::NetworkError error);
 
 private slots:
     void updateDataBaseNameListSlot();
     void onReplyFinnished();
-    void onHourChange(); ///< called everytime the hour is changed.
 
 private:
     QNetworkAccessManager &networkAcessManager_;
@@ -88,9 +85,6 @@ private:
     QNetworkReply *mReply;
     QStringList mDatabases;
     QString mDbLogPath;
-
-    QFile mLogFile;
-    QString mLogFileName;
 };
 
 #endif // INFLUXDB_H
