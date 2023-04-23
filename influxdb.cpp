@@ -88,7 +88,9 @@ void InfluxDB::insert(QString aQuery, Pressision aPressision)
             .arg(mDbName)
             .arg(pressisionToString(aPressision));
 
-    QNetworkReply *reply = networkAcessManager_.post(QNetworkRequest(url), aQuery.toLatin1());
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    QNetworkReply *reply = networkAcessManager_.post(request, aQuery.toLatin1());
     connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyFinnished);
 }
 
