@@ -70,7 +70,6 @@ private:
     void logDbQuery(QString aQuery);
     void readConfigFile();
 
-    void updateDatabaseList(); ///< update the available databases at endpoint.
     void openLogFile();
     bool isServerSideError(QNetworkReply::NetworkError error);
 

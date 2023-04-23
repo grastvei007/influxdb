@@ -17,7 +17,6 @@ InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
 {
     readConfigFile();
     openLogFile();
-    updateDatabaseList();
 }
 
 QString InfluxDB::pressisionToString(Pressision aPressision) const
@@ -45,8 +44,6 @@ void InfluxDB::setAdressAndPort(QString aAdress, int aPort)
 {
     mDBAdress = aAdress;
     mDbPort = aPort;
-
-    updateDatabaseList();
 }
 
 
@@ -125,32 +122,6 @@ void InfluxDB::useDb(QString aDbName)
 QStringList InfluxDB::getDatabases()
 {
     return mDatabases;
-}
-
-
-// curl -G "http://localhost:8086/query?pretty=true" --data-urlencode "q=show databases"
-void InfluxDB::updateDatabaseList()
-{
-    QString url = QString("http://%1:%2/query?pretty=true").arg(mDBAdress).arg(mDbPort);
-    QString query("q=show databases");
-
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    QByteArray postDate;
-    postDate.append(query.toLatin1());
-    if(mReply)
-    {
-        mReply->deleteLater();
-        mReply = nullptr;
-    }
-
-    mReply = networkAcessManager_.post(request, postDate);
-    connect(mReply, &QNetworkReply::readyRead, this, &InfluxDB::updateDataBaseNameListSlot);
-    if(mReply->waitForReadyRead(30000))
-    {
-        QByteArray data = mReply->readAll();
-        //TODO: get data..
-    }
 }
 
 void InfluxDB::updateDataBaseNameListSlot()
