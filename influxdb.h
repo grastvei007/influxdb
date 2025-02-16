@@ -70,6 +70,7 @@ private:
     void readConfigFile();
 
     bool isServerSideError(QNetworkReply::NetworkError error);
+    void tryReadApiToken();
 
 private slots:
     void updateDataBaseNameListSlot();
@@ -85,6 +86,9 @@ private:
     QNetworkReply *mReply;
     QStringList mDatabases;
     QString mDbLogPath;
+
+    QByteArray token_{};
+    bool hasApiToken_ = false;
 };
 
 #endif // INFLUXDB_H
