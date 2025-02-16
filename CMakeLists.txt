@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(influxdb)
 
-#include_directories($ENV{JUNE_ROOT})
-#link_directories($ENV{DEV_LIBS})
-
 set(CMAKE_INCLUDE_CURRENT_DIR "YES")
 set(CMAKE_AUTOMOC "YES")
 set(CMAKE_AUTOUIC "YES")
