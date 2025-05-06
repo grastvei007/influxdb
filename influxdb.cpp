@@ -14,7 +14,6 @@ InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
     networkAcessManager_(networkAccessManager),
     networkRequestFactory_(QUrl("http://localhost:8086"))
 {
-    readConfigFile();
 }
 
 QString InfluxDB::pressisionToString(Pressision aPressision) const
@@ -143,39 +142,6 @@ void InfluxDB::updateDataBaseNameListSlot()
     }
     mReply->deleteLater();
     mReply = nullptr;
-}
-
-void InfluxDB::readConfigFile()
-{
-    QString path = QProcessEnvironment::systemEnvironment().value("JUNE_ROOT");
-    path.append("/influxdb/influxdb.conf");
-    QFile file(path);
-    if(!file.exists())
-    {
-        qDebug() << __FUNCTION__ << "Config file does not exist, " << path;
-        return;
-    }
-    if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        qDebug() << __FUNCTION__ << "Error opening config file, " << path;
-        return;
-    }
-
-    while (!file.atEnd()) {
-        QString line(file.readLine());
-        if(line.startsWith("#")) // skip comments
-            continue;
-
-        // prosess line for config
-        if(line.startsWith("dblog"))
-        {
-            QStringList p = line.split(" ");
-            mDbLogPath = p[1];
-        }
-    }
-
-
-    file.close();
 }
 
 bool InfluxDB::isServerSideError(QNetworkReply::NetworkError error)

@@ -70,7 +70,6 @@ public:
 
 private:
     QString pressisionToString(Pressision aPressision) const;
-    void readConfigFile();
 
     bool isServerSideError(QNetworkReply::NetworkError error);
 
