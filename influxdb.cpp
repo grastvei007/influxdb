@@ -16,7 +16,6 @@ InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
     mDbPort(8086)
 {
     readConfigFile();
-    tryReadApiToken();
 }
 
 QString InfluxDB::pressisionToString(Pressision aPressision) const
@@ -209,37 +208,4 @@ void InfluxDB::onReplyFinnished()
     }
 
     reply->deleteLater();
-}
-
-void InfluxDB::tryReadApiToken()
-{
-    auto readToken = [this](QString filePath)
-    {
-        QFile file(filePath);
-        if(file.open(QIODevice::ReadOnly))
-        {
-            token_ = file.readAll();
-            hasApiToken_ = true;
-            return true;
-        }
-        return false;
-    };
-
-    auto envValue = QProcessEnvironment::systemEnvironment().value("XDG_CONFIG_DIRS");
-    if(envValue.isEmpty())
-    {
-        // default location for api token.
-        hasApiToken_ = readToken("/etc/xdg/june/influx_api_token.dat");
-    }
-    else
-    {
-        auto paths = envValue.split(":");
-        for(const auto &path : paths)
-        {
-            if(readToken(path + "/june/influx_api_token.dat"))
-            {
-                return;
-            }
-        }
-    }
 }

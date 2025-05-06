@@ -70,7 +70,6 @@ private:
     void readConfigFile();
 
     bool isServerSideError(QNetworkReply::NetworkError error);
-    void tryReadApiToken();
 
 private slots:
     void updateDataBaseNameListSlot();
