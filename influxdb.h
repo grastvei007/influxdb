@@ -24,6 +24,8 @@ along with Foobar.  If not, see <https://www.gnu.org/licenses/>.*/
 #include <QMap>
 #include <QTimer>
 #include <QVector>
+#include <QNetworkRequestFactory>
+
 
 class QNetworkReply;
 
@@ -53,9 +55,10 @@ public:
         eHour
     };
 
-    void setAdressAndPort(QString aAdress, int aPort);
-    void setAdress(QString aAdress);
-    void setPort(int aPort);
+    void setAdressAndPort(QString adress, int port);
+    void setAdress(QString adress);
+    void setPort(int port);
+    void setApiToken(const QByteArray &token);
 
     void createDb(QString aDbName);
     void useDb(QString aDbName);
@@ -77,8 +80,9 @@ private slots:
 
 private:
     QNetworkAccessManager &networkAcessManager_;
-    QString mDBAdress;
-    int mDbPort;
+    QNetworkRequestFactory networkRequestFactory_;
+    QString dbAdress_;
+    int dbPort_;
 
     QString mDbName; // the db current in use.
 
@@ -86,8 +90,6 @@ private:
     QStringList mDatabases;
     QString mDbLogPath;
 
-    QByteArray token_{};
-    bool hasApiToken_ = false;
 };
 
 #endif // INFLUXDB_H

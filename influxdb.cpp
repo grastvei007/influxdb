@@ -12,8 +12,7 @@
 
 InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
     networkAcessManager_(networkAccessManager),
-    mDBAdress("localhost"),
-    mDbPort(8086)
+    networkRequestFactory_(QUrl("http://localhost:8086"))
 {
     readConfigFile();
 }
@@ -35,26 +34,32 @@ QString InfluxDB::pressisionToString(Pressision aPressision) const
         case eHour:
             return "h";
     }
-    return QString();
+    return {};
 }
 
 
-void InfluxDB::setAdressAndPort(QString aAdress, int aPort)
+void InfluxDB::setAdressAndPort(QString adress, int port)
 {
-    mDBAdress = aAdress;
-    mDbPort = aPort;
+    networkRequestFactory_.setBaseUrl(QString("http://%1:%2").arg(adress, QString::number(port)));
 }
 
 
-void InfluxDB::setAdress(QString aAdress)
+void InfluxDB::setAdress(QString adress)
 {
-    mDBAdress = aAdress;
+    dbAdress_ = adress;
+    setAdressAndPort(dbAdress_, dbPort_);
 }
 
 
-void InfluxDB::setPort(int aPort)
+void InfluxDB::setPort(int port)
 {
-    mDbPort = aPort;
+    dbPort_ = port;
+    setAdressAndPort(dbAdress_, dbPort_);
+}
+
+void InfluxDB::setApiToken(const QByteArray &token)
+{
+    networkRequestFactory_.setBearerToken(token);
 }
 
 /*
@@ -64,9 +69,7 @@ void InfluxDB::setPort(int aPort)
 */
 void InfluxDB::createDb(QString aDbName)
 {
-    QString url = QString("http://%1:%2/query").arg(mDBAdress, QString::number(mDbPort));
-
-    QNetworkRequest request(url);
+    QNetworkRequest request = networkRequestFactory_.createRequest("query");
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
     QByteArray postData;
@@ -81,10 +84,8 @@ void InfluxDB::createDb(QString aDbName)
  * */
 void InfluxDB::insert(QString aQuery, Pressision aPressision)
 {
-    QString url = QString("http://%1:%2/write?db=%3&precision=%4")
-            .arg(mDBAdress, QString::number(mDbPort), mDbName, pressisionToString(aPressision));
-
-    QNetworkRequest request(url);
+    QNetworkRequest request = networkRequestFactory_.createRequest(QString("write?db=%1&precision=%1")
+            .arg(mDbName, pressisionToString(aPressision)));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     QNetworkReply *reply = networkAcessManager_.post(request, aQuery.toLatin1());
     connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyFinnished);
