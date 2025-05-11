@@ -12,8 +12,15 @@
 
 InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
     networkAcessManager_(networkAccessManager),
-    networkRequestFactory_(QUrl("http://localhost:8086"))
+    networkRequestFactory_(QUrl("http://localhost:8086")),
+    dbAdress_("localhost"),
+    dbPort_(8086),
+    basePath_()
 {
+    QHttpHeaders headers;
+    headers.append("Context-Type", "application/x-www-form-urlencoded");
+
+    networkRequestFactory_.setCommonHeaders(headers);
 }
 
 QString InfluxDB::pressisionToString(Pressision aPressision) const
@@ -36,29 +43,44 @@ QString InfluxDB::pressisionToString(Pressision aPressision) const
     return {};
 }
 
-
-void InfluxDB::setAdressAndPort(QString adress, int port)
+void InfluxDB::setAdressAndPort(const QString &adress, int port, const QString &base)
 {
-    networkRequestFactory_.setBaseUrl(QString("http://%1:%2").arg(adress, QString::number(port)));
+    networkRequestFactory_.setBaseUrl(QString("http://%1:%2%3")
+        .arg(adress, QString::number(port), base));
 }
 
 
 void InfluxDB::setAdress(QString adress)
 {
     dbAdress_ = adress;
-    setAdressAndPort(dbAdress_, dbPort_);
+    setAdressAndPort(dbAdress_, dbPort_, basePath_);
 }
 
 
 void InfluxDB::setPort(int port)
 {
     dbPort_ = port;
-    setAdressAndPort(dbAdress_, dbPort_);
+    setAdressAndPort(dbAdress_, dbPort_, basePath_);
+}
+
+void InfluxDB::setBasePath(const QString &base)
+{
+    basePath_ = base;
+    setAdressAndPort(dbAdress_, dbPort_, basePath_);
 }
 
 void InfluxDB::setApiToken(const QByteArray &token)
 {
-    networkRequestFactory_.setBearerToken(token);
+    // "Authorization: Token YOUR_API_TOKEN"
+    hasAcessToken_ = true;
+
+    QHttpHeaders headers;
+    headers.append(QHttpHeaders::WellKnownHeader::Authorization, QString("Token %1").arg(token));
+    headers.append("context-type", "text/plain; charset=utf-8");
+    headers.append("accept","application/json");
+    headers.append("content-type", "application/x-www-form-urlencoded");
+
+    networkRequestFactory_.setCommonHeaders(headers);
 }
 
 /*
@@ -69,7 +91,6 @@ void InfluxDB::setApiToken(const QByteArray &token)
 void InfluxDB::createDb(QString aDbName)
 {
     QNetworkRequest request = networkRequestFactory_.createRequest("query");
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
     QByteArray postData;
     postData.append(QString("q=CREATE DATABASE \"%1\"").arg(aDbName).toLatin1());
@@ -83,9 +104,14 @@ void InfluxDB::createDb(QString aDbName)
  * */
 void InfluxDB::insert(QString aQuery, Pressision aPressision)
 {
-    QNetworkRequest request = networkRequestFactory_.createRequest(QString("write?db=%1&precision=%1")
-            .arg(mDbName, pressisionToString(aPressision)));
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    QString str;
+    if(hasAcessToken_)
+        str = bucketWrite_ + QString("&precision=%1").arg(pressisionToString(aPressision));
+    else
+        str = QString("write?db=%1&precision=%2").arg(mDbName, pressisionToString(aPressision));
+
+    QNetworkRequest request = networkRequestFactory_.createRequest(str);
+
     QNetworkReply *reply = networkAcessManager_.post(request, aQuery.toLatin1());
     connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyFinnished);
 }
@@ -109,6 +135,14 @@ void InfluxDB::insert(QString aTableName, QString aTuppleList, qint64 aTimestamp
     insert(query, aPression);
 }
 
+void InfluxDB::getBuckets(const QString &bucket)
+{
+    bucket_ = bucket;
+    auto request = networkRequestFactory_.createRequest(QString("/api/v2/buckets?name=%1").arg(bucket));
+    auto *reply = networkAcessManager_.get(request);
+    connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyBucketFinnished);
+}
+
 void InfluxDB::useDb(QString aDbName)
 {
     mDbName = aDbName;
@@ -118,6 +152,11 @@ void InfluxDB::useDb(QString aDbName)
 QStringList InfluxDB::getDatabases()
 {
     return mDatabases;
+}
+
+QString InfluxDB::baseUrl() const
+{
+    return networkRequestFactory_.baseUrl().toString();
 }
 
 void InfluxDB::updateDataBaseNameListSlot()
@@ -170,6 +209,40 @@ void InfluxDB::onReplyFinnished()
         qDebug() << reply->errorString();
         // is there a log file, read it put in queue, delete file.
     }
-
     reply->deleteLater();
+}
+
+void InfluxDB::onReplyBucketFinnished()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if(reply->error())
+    {
+        qDebug() << "InfluxDb - error receiving buckets: " << reply->errorString();
+        reply->deleteLater();
+        return;
+    }
+
+    // capture the api link for write requst to influxDb v2.
+
+    auto data =  reply->readAll();
+    auto obj = QJsonDocument::fromJson(data).object();
+    const auto array = obj.value("buckets").toArray();
+    for(const auto jsonRef : array)
+    {
+        QJsonObject jsonObj = jsonRef.toObject();
+        if(jsonObj.contains("name") && jsonObj.value("name").toString() == bucket_)
+        {
+            QJsonObject links = jsonObj.value("links").toObject();
+            if(links.contains("write"))
+            {
+                bucketWrite_ = links.value("write").toString();
+                qDebug() << "InfluxDb: has buckets";
+                emit bucketsReceived();
+            }
+        }
+        else
+            qDebug() << "InfluxDb - bucket: " << bucket_ << " not found at endpoint.";
+
+    }
+
 }

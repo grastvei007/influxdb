@@ -55,9 +55,10 @@ public:
         eHour
     };
 
-    void setAdressAndPort(QString adress, int port);
+    void setAdressAndPort(const QString &adress, int port, const QString &base = {});
     void setAdress(QString adress);
     void setPort(int port);
+    void setBasePath(const QString &base);
     void setApiToken(const QByteArray &token);
 
     void createDb(QString aDbName);
@@ -66,7 +67,13 @@ public:
     void insert(QString aTableName, QString aTuppleList);
     void insert(QString aTableName, QString aTuppleList, qint64 aTimestamp, Pressision aPression);
 
+    void getBuckets(const QString &bucket);
+
     QStringList getDatabases();
+    QString baseUrl() const;
+
+signals:
+    void bucketsReceived();
 
 private:
     QString pressisionToString(Pressision aPressision) const;
@@ -76,18 +83,24 @@ private:
 private slots:
     void updateDataBaseNameListSlot();
     void onReplyFinnished();
+    void onReplyBucketFinnished();
 
 private:
     QNetworkAccessManager &networkAcessManager_;
     QNetworkRequestFactory networkRequestFactory_;
     QString dbAdress_;
     int dbPort_;
+    QString basePath_;
 
     QString mDbName; // the db current in use.
 
     QNetworkReply *mReply;
     QStringList mDatabases;
     QString mDbLogPath;
+    QString bucket_;
+    QString bucketWrite_;
+
+    bool hasAcessToken_ = false;
 
 };
 
