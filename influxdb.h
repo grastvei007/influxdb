@@ -24,6 +24,8 @@ along with Foobar.  If not, see <https://www.gnu.org/licenses/>.*/
 #include <QMap>
 #include <QTimer>
 #include <QVector>
+#include <QNetworkRequestFactory>
+
 
 class QNetworkReply;
 
@@ -53,38 +55,60 @@ public:
         eHour
     };
 
-    void setAdressAndPort(QString aAdress, int aPort);
-    void setAdress(QString aAdress);
-    void setPort(int aPort);
+    void setAdressAndPort(const QString &adress, int port, const QString &base = {});
+    void setAdress(QString adress);
+    void setPort(int port);
+    void setBasePath(const QString &base);
+    void setApiToken(const QByteArray &token);
+    // sends data to endpoint at first request to post data
+    // after the wait time has expired.
+    void setBulkUpdateMs(int ms);
 
     void createDb(QString aDbName);
     void useDb(QString aDbName);
-    void insert(QString aQuery, Pressision aPressision=eSecond);
     void insert(QString aTableName, QString aTuppleList);
     void insert(QString aTableName, QString aTuppleList, qint64 aTimestamp, Pressision aPression);
 
+    void getBuckets(const QString &bucket);
+
     QStringList getDatabases();
+    QString baseUrl() const;
+
+signals:
+    void bucketsReceived();
 
 private:
+    void insert(QString aQuery, Pressision aPressision=eSecond);
     QString pressisionToString(Pressision aPressision) const;
-    void readConfigFile();
 
     bool isServerSideError(QNetworkReply::NetworkError error);
 
 private slots:
     void updateDataBaseNameListSlot();
     void onReplyFinnished();
+    void onReplyBucketFinnished();
 
 private:
     QNetworkAccessManager &networkAcessManager_;
-    QString mDBAdress;
-    int mDbPort;
+    QNetworkRequestFactory networkRequestFactory_;
+    QString dbAdress_;
+    int dbPort_;
+    QString basePath_;
 
     QString mDbName; // the db current in use.
 
     QNetworkReply *mReply;
     QStringList mDatabases;
     QString mDbLogPath;
+    QString bucket_;
+    QString bucketWrite_;
+
+    bool hasAcessToken_ = false;
+    bool useBulkUpdate_ = false;
+    int bulkUpdateTimeMs_ = 0;
+    qint64 lastUpdateMs_ = 0;
+    QByteArray requestBuffer_ = {};
+
 };
 
 #endif // INFLUXDB_H

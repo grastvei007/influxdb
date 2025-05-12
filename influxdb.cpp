@@ -12,10 +12,15 @@
 
 InfluxDB::InfluxDB(QNetworkAccessManager &networkAccessManager) :
     networkAcessManager_(networkAccessManager),
-    mDBAdress("localhost"),
-    mDbPort(8086)
+    networkRequestFactory_(QUrl("http://localhost:8086")),
+    dbAdress_("localhost"),
+    dbPort_(8086),
+    basePath_()
 {
-    readConfigFile();
+    QHttpHeaders headers;
+    headers.append("Context-Type", "application/x-www-form-urlencoded");
+
+    networkRequestFactory_.setCommonHeaders(headers);
 }
 
 QString InfluxDB::pressisionToString(Pressision aPressision) const
@@ -35,26 +40,53 @@ QString InfluxDB::pressisionToString(Pressision aPressision) const
         case eHour:
             return "h";
     }
-    return QString();
+    return {};
+}
+
+void InfluxDB::setAdressAndPort(const QString &adress, int port, const QString &base)
+{
+    networkRequestFactory_.setBaseUrl(QString("http://%1:%2%3")
+        .arg(adress, QString::number(port), base));
 }
 
 
-void InfluxDB::setAdressAndPort(QString aAdress, int aPort)
+void InfluxDB::setAdress(QString adress)
 {
-    mDBAdress = aAdress;
-    mDbPort = aPort;
+    dbAdress_ = adress;
+    setAdressAndPort(dbAdress_, dbPort_, basePath_);
 }
 
 
-void InfluxDB::setAdress(QString aAdress)
+void InfluxDB::setPort(int port)
 {
-    mDBAdress = aAdress;
+    dbPort_ = port;
+    setAdressAndPort(dbAdress_, dbPort_, basePath_);
 }
 
-
-void InfluxDB::setPort(int aPort)
+void InfluxDB::setBasePath(const QString &base)
 {
-    mDbPort = aPort;
+    basePath_ = base;
+    setAdressAndPort(dbAdress_, dbPort_, basePath_);
+}
+
+void InfluxDB::setApiToken(const QByteArray &token)
+{
+    // "Authorization: Token YOUR_API_TOKEN"
+    hasAcessToken_ = true;
+
+    QHttpHeaders headers;
+    headers.append(QHttpHeaders::WellKnownHeader::Authorization, QString("Token %1").arg(token));
+    headers.append("context-type", "text/plain; charset=utf-8");
+    headers.append("accept","application/json");
+    headers.append("content-type", "application/x-www-form-urlencoded");
+
+    networkRequestFactory_.setCommonHeaders(headers);
+}
+
+void InfluxDB::setBulkUpdateMs(int ms)
+{
+    bulkUpdateTimeMs_ = ms;
+    useBulkUpdate_ = ms == 0 ? false : true;
 }
 
 /*
@@ -64,10 +96,7 @@ void InfluxDB::setPort(int aPort)
 */
 void InfluxDB::createDb(QString aDbName)
 {
-    QString url = QString("http://%1:%2/query").arg(mDBAdress).arg(QString::number(mDbPort));
-
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    QNetworkRequest request = networkRequestFactory_.createRequest("query");
 
     QByteArray postData;
     postData.append(QString("q=CREATE DATABASE \"%1\"").arg(aDbName).toLatin1());
@@ -79,18 +108,38 @@ void InfluxDB::createDb(QString aDbName)
 /*
  * $ curl -i -XPOST "http://localhost:8086/write?db=june&precision=s" --data-binary 'bmv,v=12.3 1463683075'
  * */
-void InfluxDB::insert(QString aQuery, Pressision aPressision)
+void InfluxDB::insert(QString query, Pressision pressision)
 {
-    QString url = QString("http://%1:%2/write?db=%3&precision=%4")
-            .arg(mDBAdress)
-            .arg(QString::number(mDbPort))
-            .arg(mDbName)
-            .arg(pressisionToString(aPressision));
+    auto ms = QDateTime::currentMSecsSinceEpoch();
+    auto shouldRecordRequest = [this, &ms]()
+        {return useBulkUpdate_ && ((ms - lastUpdateMs_) < bulkUpdateTimeMs_);};
 
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    QNetworkReply *reply = networkAcessManager_.post(request, aQuery.toLatin1());
+    if(requestBuffer_.isEmpty())
+        requestBuffer_ = query.toLatin1();
+    else
+    {
+        requestBuffer_.append("\n");
+        requestBuffer_.append(query.toLatin1());
+    }
+
+    if(shouldRecordRequest())
+    {
+        return;
+    }
+
+    lastUpdateMs_ = QDateTime::currentMSecsSinceEpoch();
+    QString str;
+    if(hasAcessToken_)
+        str = bucketWrite_ + QString("&precision=%1").arg(pressisionToString(pressision));
+    else
+        str = QString("write?db=%1&precision=%2").arg(mDbName, pressisionToString(pressision));
+
+    QNetworkRequest request = networkRequestFactory_.createRequest(str);
+
+    QNetworkReply *reply = networkAcessManager_.post(request, requestBuffer_);
     connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyFinnished);
+
+    requestBuffer_.clear();
 }
 
 /**
@@ -102,14 +151,22 @@ void InfluxDB::insert(QString aTableName, QString aTuppleList)
 {
      qint64 timestamp = QDateTime::currentSecsSinceEpoch();
 
-    QString query = QString("%1 %2 %3").arg(aTableName).arg(aTuppleList).arg(timestamp);
+    QString query = QString("%1 %2 %3").arg(aTableName, aTuppleList, QString::number(timestamp));
     insert(query);
 }
 
 void InfluxDB::insert(QString aTableName, QString aTuppleList, qint64 aTimestamp, InfluxDB::Pressision aPression)
 {
-    QString query = QString("%1 %2 %3").arg(aTableName).arg(aTuppleList).arg(aTimestamp);
+    QString query = QString("%1 %2 %3").arg(aTableName, aTuppleList, QString::number(aTimestamp));
     insert(query, aPression);
+}
+
+void InfluxDB::getBuckets(const QString &bucket)
+{
+    bucket_ = bucket;
+    auto request = networkRequestFactory_.createRequest(QString("/api/v2/buckets?name=%1").arg(bucket));
+    auto *reply = networkAcessManager_.get(request);
+    connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyBucketFinnished);
 }
 
 void InfluxDB::useDb(QString aDbName)
@@ -121,6 +178,11 @@ void InfluxDB::useDb(QString aDbName)
 QStringList InfluxDB::getDatabases()
 {
     return mDatabases;
+}
+
+QString InfluxDB::baseUrl() const
+{
+    return networkRequestFactory_.baseUrl().toString();
 }
 
 void InfluxDB::updateDataBaseNameListSlot()
@@ -145,39 +207,6 @@ void InfluxDB::updateDataBaseNameListSlot()
     }
     mReply->deleteLater();
     mReply = nullptr;
-}
-
-void InfluxDB::readConfigFile()
-{
-    QString path = QProcessEnvironment::systemEnvironment().value("JUNE_ROOT");
-    path.append("/influxdb/influxdb.conf");
-    QFile file(path);
-    if(!file.exists())
-    {
-        qDebug() << __FUNCTION__ << "Config file does not exist, " << path;
-        return;
-    }
-    if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        qDebug() << __FUNCTION__ << "Error opening config file, " << path;
-        return;
-    }
-
-    while (!file.atEnd()) {
-        QString line(file.readLine());
-        if(line.startsWith("#")) // skip comments
-            continue;
-
-        // prosess line for config
-        if(line.startsWith("dblog"))
-        {
-            QStringList p = line.split(" ");
-            mDbLogPath = p[1];
-        }
-    }
-
-
-    file.close();
 }
 
 bool InfluxDB::isServerSideError(QNetworkReply::NetworkError error)
@@ -206,6 +235,40 @@ void InfluxDB::onReplyFinnished()
         qDebug() << reply->errorString();
         // is there a log file, read it put in queue, delete file.
     }
-
     reply->deleteLater();
+}
+
+void InfluxDB::onReplyBucketFinnished()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if(reply->error())
+    {
+        qDebug() << "InfluxDb - error receiving buckets: " << reply->errorString();
+        reply->deleteLater();
+        return;
+    }
+
+    // capture the api link for write requst to influxDb v2.
+
+    auto data =  reply->readAll();
+    auto obj = QJsonDocument::fromJson(data).object();
+    const auto array = obj.value("buckets").toArray();
+    for(const auto jsonRef : array)
+    {
+        QJsonObject jsonObj = jsonRef.toObject();
+        if(jsonObj.contains("name") && jsonObj.value("name").toString() == bucket_)
+        {
+            QJsonObject links = jsonObj.value("links").toObject();
+            if(links.contains("write"))
+            {
+                bucketWrite_ = links.value("write").toString();
+                qDebug() << "InfluxDb: has buckets";
+                emit bucketsReceived();
+            }
+        }
+        else
+            qDebug() << "InfluxDb - bucket: " << bucket_ << " not found at endpoint.";
+
+    }
+
 }
