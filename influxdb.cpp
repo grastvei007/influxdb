@@ -83,6 +83,12 @@ void InfluxDB::setApiToken(const QByteArray &token)
     networkRequestFactory_.setCommonHeaders(headers);
 }
 
+void InfluxDB::setBulkUpdateMs(int ms)
+{
+    bulkUpdateTimeMs_ = ms;
+    useBulkUpdate_ = ms == 0 ? false : true;
+}
+
 /*
  * $ curl -XPOST 'http://localhost:8086/query' --data-urlencode 'q=CREATE DATABASE "june"'
 
@@ -102,18 +108,38 @@ void InfluxDB::createDb(QString aDbName)
 /*
  * $ curl -i -XPOST "http://localhost:8086/write?db=june&precision=s" --data-binary 'bmv,v=12.3 1463683075'
  * */
-void InfluxDB::insert(QString aQuery, Pressision aPressision)
+void InfluxDB::insert(QString query, Pressision pressision)
 {
+    auto ms = QDateTime::currentMSecsSinceEpoch();
+    auto shouldRecordRequest = [this, &ms]()
+        {return useBulkUpdate_ && ((ms - lastUpdateMs_) < bulkUpdateTimeMs_);};
+
+    if(requestBuffer_.isEmpty())
+        requestBuffer_ = query.toLatin1();
+    else
+    {
+        requestBuffer_.append("\n");
+        requestBuffer_.append(query.toLatin1());
+    }
+
+    if(shouldRecordRequest())
+    {
+        return;
+    }
+
+    lastUpdateMs_ = QDateTime::currentMSecsSinceEpoch();
     QString str;
     if(hasAcessToken_)
-        str = bucketWrite_ + QString("&precision=%1").arg(pressisionToString(aPressision));
+        str = bucketWrite_ + QString("&precision=%1").arg(pressisionToString(pressision));
     else
-        str = QString("write?db=%1&precision=%2").arg(mDbName, pressisionToString(aPressision));
+        str = QString("write?db=%1&precision=%2").arg(mDbName, pressisionToString(pressision));
 
     QNetworkRequest request = networkRequestFactory_.createRequest(str);
 
-    QNetworkReply *reply = networkAcessManager_.post(request, aQuery.toLatin1());
+    QNetworkReply *reply = networkAcessManager_.post(request, requestBuffer_);
     connect(reply, &QNetworkReply::finished, this, &InfluxDB::onReplyFinnished);
+
+    requestBuffer_.clear();
 }
 
 /**

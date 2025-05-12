@@ -60,10 +60,12 @@ public:
     void setPort(int port);
     void setBasePath(const QString &base);
     void setApiToken(const QByteArray &token);
+    // sends data to endpoint at first request to post data
+    // after the wait time has expired.
+    void setBulkUpdateMs(int ms);
 
     void createDb(QString aDbName);
     void useDb(QString aDbName);
-    void insert(QString aQuery, Pressision aPressision=eSecond);
     void insert(QString aTableName, QString aTuppleList);
     void insert(QString aTableName, QString aTuppleList, qint64 aTimestamp, Pressision aPression);
 
@@ -76,6 +78,7 @@ signals:
     void bucketsReceived();
 
 private:
+    void insert(QString aQuery, Pressision aPressision=eSecond);
     QString pressisionToString(Pressision aPressision) const;
 
     bool isServerSideError(QNetworkReply::NetworkError error);
@@ -101,6 +104,10 @@ private:
     QString bucketWrite_;
 
     bool hasAcessToken_ = false;
+    bool useBulkUpdate_ = false;
+    int bulkUpdateTimeMs_ = 0;
+    qint64 lastUpdateMs_ = 0;
+    QByteArray requestBuffer_ = {};
 
 };
 
