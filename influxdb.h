@@ -108,6 +108,7 @@ private:
     int bulkUpdateTimeMs_ = 0;
     qint64 lastUpdateMs_ = 0;
     QByteArray requestBuffer_ = {};
+    int retryReceiveBuckets_ = 10;
 
 };
 

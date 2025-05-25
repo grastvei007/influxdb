@@ -245,6 +245,19 @@ void InfluxDB::onReplyBucketFinnished()
     {
         qDebug() << "InfluxDb - error receiving buckets: " << reply->errorString();
         reply->deleteLater();
+        retryReceiveBuckets_ -= 1;
+        if(retryReceiveBuckets_ > 0)
+        {
+            qDebug() << "Retry: " << retryReceiveBuckets_ << ", to receive bucket in 20 seconds";
+            int twentySeconds = 20 * 1000;
+            QTimer::singleShot(twentySeconds, this, [this](){
+                getBuckets(bucket_);
+            });
+        }
+        else
+        {
+            qDebug() << "Unable to receive bucket, max retries exhausted.";
+        }
         return;
     }
 
